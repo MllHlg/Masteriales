@@ -155,6 +155,17 @@ def remesh():
     gmsh.model.mesh.clear([])
     gmsh.model.mesh.generate(2)  # gives the coarse mesh only
 
+def print_infos():
+    print("---------------------------------")
+    print("Faces ", get_face_tags())
+    for f_tag in get_face_tags():
+        q = Query()
+        print("Face ", f_tag,", center ", center(f_tag),", and area ", area(f_tag))
+        print(" --> curves ", q.get_curves(f_tag))
+        print(" --> points ", q.get_corners(f_tag))
+
+
+# Calcul de l'angle d'un sommet grâce aux sommets voisins
 def calculate_angle_from_point(p, a, b):
     """
     Calcule l'angle formé au point P entre deux segments AP et BP,
@@ -193,11 +204,96 @@ def calculate_angle_from_point(p, a, b):
     angle_degrees = math.degrees(theta)
     return angle_degrees
 
-def print_infos():
-    print("---------------------------------")
-    print("Faces ", get_face_tags())
-    for f_tag in get_face_tags():
-        q = Query()
-        print("Face ", f_tag,", center ", center(f_tag),", and area ", area(f_tag))
-        print(" --> curves ", q.get_curves(f_tag))
-        print(" --> points ", q.get_corners(f_tag))
+# Calcul des limites en x et y de la forme fournie
+def get_limits_face(face_tag):
+    points_coor = [point_coordinate(a) for a in Query().get_corners(face_tag)]
+    min_X = min(coor[0] for coor in points_coor)
+    max_X = max(coor[0] for coor in points_coor)
+    min_Y = min(coor[1] for coor in points_coor)
+    max_Y = max(coor[1] for coor in points_coor)
+    return max_Y, min_Y, max_X, min_X
+
+# Génère des identifiants pour les points par rapport à leurs coordonnées et leur associe un angle
+def points_id(points) :
+    pointsID = {}
+    chemin = get_chemin(points[0], [int(points[0])], points)
+    for i in range(len(points)) :
+        pointsID[point_coordinate(chemin[i])] = calculate_angle_from_point(point_coordinate(chemin[i]), point_coordinate(chemin[i-1]), point_coordinate(chemin[(i+1)%len(points)]))
+    return pointsID
+
+# Renvoie les sommets voisins d'un point donné dans une forme donnée
+def get_voisins(point, angles):
+    segments = Query().adjacent_curves(point)
+    return [i for seg in segments for i in Query().adjacent_points(seg) if i != point and i in angles]
+
+# Donne un chemin pour parcourir une forme de point en point afin de calculer les angles des sommets
+def get_chemin(point, chemin, angles):
+    coorDep = point_coordinate(point)
+    segments = Query().adjacent_curves(point)
+    if len(chemin) > 1:
+        for seg in segments:
+            angle = [i for i in Query().adjacent_points(seg) if i != point and i in angles]
+            if angle and int(angle[0]) not in chemin:
+                chemin.append(int(angle[0]))
+                get_chemin(angle[0], chemin, angles)
+    else:
+        other = False
+        for v in get_voisins(point, angles):
+            coor = point_coordinate(v)
+            if ((coor[0] != coorDep[0] and coor[0] > coorDep[0]) or other):
+                chemin.append(int(v))
+                get_chemin(v, chemin, angles)
+            else:
+                other = True      
+    return chemin
+
+# Calcul des sommets ayant un angle concave, donc sur lesquels on peu faire une coupe
+def angles_concaves(face) :
+    return [face.get_point_tag_by_coor(clé) for clé, valeur in face.get_pointsID().items() if valeur > 190.]
+
+class Forme :
+    def __init__(self):
+        self.__face_tags = get_face_tags()
+        self.__faces = [Face(tag) for tag in self.__face_tags]
+        self.__points = get_point_tags()
+        self.__edges = get_edge_tags()
+    
+    def get_faces(self) :
+        return self.__faces
+
+    def get_face_by_tag(self, face_tag):
+        return next((f for f in self.__faces if f.get_tag() == face_tag), None)
+
+
+class Face :
+    def __init__(self, tag):
+        self.__tag = tag
+        self.__points = Query().get_corners(self.__tag)
+        self.__edges = Query().get_curves(self.__tag)
+        self.__limits = get_limits_face(self.__tag)
+        self.__pointsID = points_id(self.__points)
+
+    def get_tag(self) :
+        return self.__tag
+
+    def get_points(self) :
+        return self.__points
+    
+    def get_pointsID(self):
+        return self.__pointsID
+
+    def get_point_tag_by_coor(self, coor) :
+        return next((p for p in self.__points if point_coordinate(p) == coor), None)
+    
+    def get_limits(self) :
+        return self.__limits
+
+    # Vérifie si la face est un rectangle ou non 
+    def isRect(self) :
+        Rect = True
+        for point in self.__points :
+            coord = point_coordinate(point)
+            if coord[0] in self.__limits or coord[1] in self.__limits : break
+            Rect = False
+        if self.__limits[0] == self.__limits[1] or self.__limits[2] == self.__limits[3] : Quadr = False
+        return Rect
