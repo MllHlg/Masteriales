@@ -141,7 +141,7 @@ def cut(point_tag, face_tag, dir):
 
 def finalize():
     """ Finalize the gmsh call """
-    gmsh.fltk.run()
+    #gmsh.fltk.run()
     gmsh.finalize()
 
 def center(face_tag):
