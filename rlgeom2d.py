@@ -164,7 +164,13 @@ def print_infos():
         print(" --> curves ", q.get_curves(f_tag))
         print(" --> points ", q.get_corners(f_tag))
 
-
+# Retourne le tag d'un point grâce à ses coordonnées
+def get_point_tag_by_coord(coord) :
+    points = get_point_tags()
+    for p in points :
+        if coord == point_coordinate(p) :
+            return p
+    
 # Calcul de l'angle d'un sommet grâce aux sommets voisins
 def calculate_angle_from_point(p, a, b):
     """
@@ -249,4 +255,33 @@ def get_chemin(point, chemin, angles):
 
 # Calcul des sommets ayant un angle concave, donc sur lesquels on peu faire une coupe
 def angles_concaves(face) :
-    return [face.get_point_tag_by_coor(clé) for clé, valeur in face.get_pointsID().items() if valeur > 190.]
+    return [get_point_tag_by_coord(clé) for clé, valeur in face.get_pointsID().items() if valeur > 190.]
+
+# Trier couple de coordonnées des points définissant un segment
+def trier_points(segment):
+    """
+    Trie un couple de points selon le plus petit x en premier,
+    et en cas d'égalité sur x, selon le plus petit y.
+    
+    :param segment: tuple contenant deux points (x1, y1), (x2, y2)
+    :return: tuple contenant les points triés
+    """
+    # Extraire les points
+    point1, point2 = segment
+    
+    # Trier selon x, et ensuite selon y si x est identique
+    if (point1[0], point1[1]) <= (point2[0], point2[1]):
+        return (point1, point2)
+    else:
+        return (point2, point1)
+
+# Permet de renvoyer l'autre point formant le segment crée par une cut
+def get_new_segment(point_coor, dir) :
+    point = get_point_tag_by_coord(point_coor)
+    segments = Query().adjacent_curves(point)
+    voisins = [point_coordinate(i) for seg in segments for i in Query().adjacent_points(seg) if i != point]
+    match dir :
+        case 1 : return [v for v in voisins if (v[0] == point_coor[0]) and (v[1] > point_coor[1])][0]
+        case 2 : return [v for v in voisins if (v[0] == point_coor[0]) and (v[1] < point_coor[1])][0]
+        case 3 : return [v for v in voisins if (v[1] == point_coor[1]) and (v[0] > point_coor[0])][0]
+        case 4 : return [v for v in voisins if (v[1] == point_coor[1]) and (v[0] < point_coor[0])][0]
