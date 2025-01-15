@@ -12,8 +12,9 @@ class Shape:
         self.start_shape()
         self.__face_tags = get_face_tags()
         self.__faces = [Face(tag) for tag in self.__face_tags]
-        self.__points = get_point_tags()
-        self.__edges = get_edge_tags()
+        self.nb_visits = []
+        self.array_rewards = []
+        self.array_states = []
 
     def get_start(self):
         assert self.start is not None
@@ -69,12 +70,11 @@ class Shape:
             case 2 : self.create_shape_2()
             case 3 : self.create_shape_3()
             case 4 : self.create_shape_4()
+        self.update()
 
     def update(self) :
         self.__face_tags = get_face_tags()
         self.__faces = [Face(tag) for tag in self.__face_tags]
-        self.__points = get_point_tags()
-        self.__edges = get_edge_tags()
 
     def create_shape_1(self):
         """ create a first shape"""
@@ -106,9 +106,10 @@ class Shape:
         r4 = create_rectangle(0, 0, 1.1, 2)
         fuse([r1, r2, r3, r4])
 
-# A definir
-    def visit(self,x,y):
-        #self.nb_visits[x,y] +=1
+    def visit(self,state):
+        ind = self.array_states.index(state)
+        self.nb_visits[ind] += 1
+        self.array_rewards[ind] += self.get_reward()
         return False
 
 
@@ -128,13 +129,10 @@ class Face :
     
     def get_pointsID(self):
         return self.__pointsID
-
-    def get_point_tag_by_coor(self, coor) :
-        return next((p for p in self.__points if point_coordinate(p) == coor), None)
     
     def get_limits(self) :
         return self.__limits
-
+    
     # Vérifie si la face est un rectangle ou non 
     def isRect(self) :
         Rect = True
@@ -153,14 +151,12 @@ class ShapeEnv(gym.Env):
     def __init__(self, s):
         super(ShapeEnv, self).__init__()
         self.shape = s
-
-        self.action_space = s.get_action_space()
+        self.state = []
 
         # Initialisation de la récompense
         self.reward = 0
         self.steps = 0
-        
-        self.current_state = self.shape.get_start()
+
         self.terminated = False
 
     def get_random_action(self) :
@@ -169,25 +165,36 @@ class ShapeEnv(gym.Env):
             return self.action_space[random.randint(0, len(self.action_space)-1)]
         else : self.terminated = True
     
-    # A compléter une fois la fonction visit fini
-    def set_current_state(self, state):
-        self.current_state = state
-        #self.shape.visit(state[0], state[1])
-
     def reset(self):
-        self.set_current_state(self.shape.get_start())
+        self.close()
+        self.shape.start_shape()
+        self.state = []
         self.steps = 0
         self.terminated = False
-        return self.current_state
 
     def step(self, action):
+        coord_point = point_coordinate(action[0])
         cut(action[0], action[1], action[2])
         self.steps += 1
         self.shape.update()
-        return self.shape.get_reward()
+        reward = self.shape.get_reward()
+        self.state.append(trier_points((coord_point, get_new_segment(coord_point, action[2]))))
+        if sorted(self.state) in self.shape.array_states :
+            self.shape.visit(sorted(self.state))
+        else :
+            self.shape.array_states.append(sorted(self.state).copy())
+            self.shape.nb_visits.append(1)
+            self.shape.array_rewards.append(reward)
+        return reward
 
     def render(self):
         remesh()
+
+    def afficheEtat(self) :
+        #print(self.shape.array_states)
+        print(self.shape.nb_visits)
+        self.shape.array_rewards = np.round(np.divide(self.shape.array_rewards, self.shape.nb_visits), decimals=nb_digit_rounding).tolist()
+        print(self.shape.array_rewards)
 
     def close(self):
         gmsh.write("mesh_gmsh.vtk")
