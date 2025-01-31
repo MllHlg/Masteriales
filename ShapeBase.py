@@ -15,6 +15,7 @@ class Shape:
         self.nb_visits = []
         self.array_rewards = []
         self.array_states = []
+        self.Q = {}
 
     def get_start(self):
         assert self.start is not None
@@ -152,7 +153,6 @@ class ShapeEnv(gym.Env):
         super(ShapeEnv, self).__init__()
         self.shape = s
         self.state = []
-
         # Initialisation de la récompense
         self.reward = 0
         self.steps = 0
@@ -162,9 +162,24 @@ class ShapeEnv(gym.Env):
     def get_random_action(self) :
         self.action_space = self.shape.get_action_space()
         if len(self.action_space) > 0 :
+            self.action_from_Q()
             return self.action_space[random.randint(0, len(self.action_space)-1)]
         else : self.terminated = True
     
+    def action_from_Q(self) :
+        state = tuple(sorted(self.state))
+        if state in self.shape.Q :
+            actions = self.shape.Q[state]
+            max_action = max(actions, key=actions.get)
+            return (get_point_tag_by_coord(max_action[0]), max_action[1])
+        else :
+            actions = {}
+            for point_tag,_,direction in self.action_space :
+                actions[(point_coordinate(point_tag), direction)] = 0.
+            self.shape.Q[state] = actions
+            random_key = random.choice(list(actions.keys()))
+            return (get_point_tag_by_coord(random_key[0]), random_key[1])
+
     def reset(self):
         self.close()
         self.shape.start_shape()
@@ -192,9 +207,10 @@ class ShapeEnv(gym.Env):
 
     def afficheEtat(self) :
         #print(self.shape.array_states)
-        print(self.shape.nb_visits)
+        print(f"Tableau nb visits : {self.shape.nb_visits}")
         self.shape.array_rewards = np.round(np.divide(self.shape.array_rewards, self.shape.nb_visits), decimals=nb_digit_rounding).tolist()
-        print(self.shape.array_rewards)
+        print(f"Tableau des rewards : {self.shape.array_rewards}")
+        print(f"Tableau Q : {self.shape.Q}")
 
     def close(self):
         gmsh.write("mesh_gmsh.vtk")
