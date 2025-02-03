@@ -6,14 +6,24 @@ if __name__ == '__main__':
 
     # Quatre formes disponibles pour l'instant
     env = ShapeEnv(Shape(1))
-    episodes = 20
+    episodes = 100
+    epsilon = 0.1
+    alpha = 0.5
+    gamma = 0.2
     for e in range(episodes) :
         if e > 0 : env.reset()
-        action = env.get_random_action()
+        action = env.get_random_action(epsilon)
         while not env.terminated:
+            state = tuple(sorted(env.state))
+            point = point_coordinate(action[0])
             reward = env.step(action)
-            #print("Reward: ", reward)
-            action = env.get_random_action()
+            next_state = tuple(sorted(env.state))
+            next_action = env.get_random_action(epsilon)
+            if not env.terminated:
+                env.shape.Q[state][(point, action[2])] += alpha * (reward + gamma * env.shape.Q[next_state][(point_coordinate(next_action[0]), next_action[2])] - env.shape.Q[state][(point, action[2])])
+                action = next_action
+            else :
+                env.shape.Q[state][(point, action[2])] += alpha * (reward - env.shape.Q[state][(point, action[2])])
         env.render()
     env.afficheEtat()
 
