@@ -69,7 +69,7 @@ def run(epsilon, alpha, gamma, episodes: int = 100) -> None:
 
 if __name__ == '__main__':
     
-    run(0.1,0.1,0.6, 1000)
+    run(0.1,0.5,0.55, 1000)
     
     ## Cut from point 13, face 2 in direction 3 (east)
     #cut(13, 2, 3)
