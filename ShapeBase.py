@@ -164,9 +164,9 @@ class ShapeEnv(gym.Env):
         if len(self.action_space) > 0 :
             action =  self.action_from_Q()
             if np.random.uniform(0, 1) < epsilon:
-                return next((triple for triple in self.action_space if triple[0] == action[0] and triple[2] == action[1]), None)
-            else :
                 return self.action_space[random.randint(0, len(self.action_space)-1)]
+            else :
+                return next((triple for triple in self.action_space if triple[0] == action[0] and triple[2] == action[1]), None)
         else : self.terminated = True
     
     def action_from_Q(self) :
@@ -209,11 +209,9 @@ class ShapeEnv(gym.Env):
         remesh()
 
     def afficheEtat(self) :
-        #print(self.shape.array_states)
         print(f"Tableau nb visits : {self.shape.nb_visits}")
         self.shape.array_rewards = np.round(np.divide(self.shape.array_rewards, self.shape.nb_visits), decimals=nb_digit_rounding).tolist()
         print(f"Tableau des rewards : {self.shape.array_rewards}")
-        #print(f"Tableau Q : {self.shape.Q}")
 
     def close(self):
         gmsh.write("mesh_gmsh.vtk")
